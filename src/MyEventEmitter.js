@@ -1,86 +1,77 @@
 'use strict';
 
 class MyEventEmitter {
-  listeners = {};
-
-  on(eventName, func) {
-    if (!(eventName in this.listeners)) {
-      this.listeners[eventName] = [func];
-    } else {
-      this.listeners[eventName].push(func);
-    }
+  constructor() {
+    this.events = {};
   }
 
-  once(eventName, func) {
-    const onceFunc = (...args) => {
-      func(...args);
-      this.off(eventName, onceFunc);
-    };
-
-    this.on(eventName, onceFunc);
-
-    return this;
-  }
-
-  off(eventName, func) {
-    if (this.listeners[eventName]) {
-      const index = this.listeners[eventName].indexOf(func);
-
-      if (index !== -1) {
-        this.listeners[eventName].splice(index, 1);
-      }
-    }
-
-    return this;
-  }
-
-  emit(eventName, ...args) {
-    if (!this.listeners[eventName]) {
+  on(event, listener) {
+    if (typeof listener !== 'function') {
       return;
     }
 
-    const listenersToCall = [...this.listeners[eventName]];
-
-    listenersToCall.forEach((func) => {
-      func(...args);
-    });
-  }
-
-  prependListener(eventName, func) {
-    if (!(eventName in this.listeners)) {
-      this.listeners[eventName] = [func];
-    } else {
-      this.listeners[eventName].unshift(func);
+    if (!this.events[event]) {
+      this.events[event] = [];
     }
+
+    this.events[event].push(listener);
   }
 
-  prependOnceListener(eventName, func) {
-    const onceFunc = (...args) => {
-      func(...args);
-      this.off(eventName, onceFunc);
+  once(event, listener) {
+    const onceWrapper = (...args) => {
+      this.off(event, onceWrapper);
+      listener.apply(this, args);
     };
 
-    this.prependListener(eventName, onceFunc);
-
-    return this;
+    onceWrapper.originalListener = listener;
+    this.on(event, onceWrapper);
   }
 
-  removeAllListeners(eventName) {
-    if (!eventName) {
-      this.listeners = {};
-    } else {
-      delete this.listeners[eventName];
+  off(event, listener) {
+    if (!this.events[event]) {
+      throw new Error(`Event '${event}' doesn't exist`);
     }
 
-    return this;
+    this.events[event] = this.events[event].filter(
+      (e) => e !== listener && e.originalListener !== listener,
+    );
   }
 
-  listenerCount(eventName) {
-    if (this.listeners[eventName]) {
-      return this.listeners[eventName].length;
-    } else {
-      return 0;
+  emit(event, ...args) {
+    if (!this.events[event] || this.events[event].length === 0) {
+      return;
     }
+
+    this.events[event].slice().forEach((e) => e.apply(this, args));
+  }
+
+  prependListener(event, listener) {
+    if (!this.events[event]) {
+      this.events[event] = [];
+    }
+
+    this.events[event].unshift(listener);
+  }
+
+  prependOnceListener(event, listener) {
+    const onceWrapper = (...args) => {
+      this.off(event, onceWrapper);
+      listener.apply(this, args);
+    };
+
+    this.prependListener(event, onceWrapper);
+  }
+
+  removeAllListeners(event) {
+    if (event) {
+      this.events[event] = [];
+    } else {
+      this.events = {};
+    }
+  }
+
+  listenerCount(event) {
+    return this.events[event] ? this.events[event].length : 0;
   }
 }
 
